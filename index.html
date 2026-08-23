@@ -525,6 +525,35 @@
     .brand-logo { width: 30px; height: 30px; font-size: 16px; }
     .main { padding: 12px 12px 100px; }
   }
+  /* 备份与恢复弹窗（复制粘贴式备份码） */
+  .backup-block { margin-bottom: 4px; }
+  .backup-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+  .backup-code {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    background: var(--light-gray);
+    color: var(--text);
+    word-break: break-all;
+  }
+  .backup-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .backup-divider { display: flex; align-items: center; color: var(--text-muted); font-size: 12px; margin: 14px 0; }
+  .backup-divider::before, .backup-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .backup-divider span { padding: 0 10px; }
+  /* 删除确认（三次倒计时） */
+  .del-warn {
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+    font-weight: 600;
+  }
+  .del-step { margin-top: 10px; color: var(--text-muted); font-size: 13px; text-align: center; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -597,8 +626,7 @@
   <!-- 底部操作栏 -->
   <div class="bottom-bar" id="bottomBar">
     <button class="btn btn-primary" id="btnSave">💾 保存配方</button>
-    <button class="btn btn-ghost" id="btnExport">📤 导出备份</button>
-    <button class="btn btn-ghost" id="btnImport">📥 导入备份</button>
+    <button class="btn btn-ghost" id="btnBackup">📦 备份与恢复</button>
     <button class="btn btn-danger" id="btnDelete">🗑 删除</button>
   </div>
 </div>
@@ -680,6 +708,59 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-primary btn-block" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 备份与恢复（复制粘贴式备份码） -->
+<div class="modal-mask" id="modalBackup">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>备份与恢复</h3>
+      <button class="icon-btn" style="background:var(--light-gray);border:1px solid var(--border);color:var(--text-secondary);width:30px;height:30px" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="backup-block">
+        <label class="backup-label">① 导出：复制下面的备份码，妥善保存（存备忘录、微信发给自己都行）</label>
+        <textarea class="form-input backup-code" id="backupCode" rows="4" readonly></textarea>
+        <div class="backup-actions">
+          <button class="btn btn-primary btn-sm" id="btnCopyBackup">复制备份码</button>
+          <button class="btn btn-ghost btn-sm" id="btnDownloadBackup">下载文件</button>
+        </div>
+      </div>
+      <div class="backup-divider"><span>或</span></div>
+      <div class="backup-block">
+        <label class="backup-label">② 导入：把备份码粘贴到下面</label>
+        <textarea class="form-input backup-code" id="importCode" rows="4" placeholder="在此粘贴备份码…"></textarea>
+        <div class="backup-actions">
+          <button class="btn btn-primary btn-sm" id="btnDoImport">导入备份码</button>
+          <button class="btn btn-ghost btn-sm" id="btnImportFile2">从文件选择</button>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:12px;margin-bottom:0">
+        备份码就是一段文本，换手机或重装后，粘贴回来即可恢复全部配方与 Logo。
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary btn-block" data-close>完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认（三次提醒倒计时，防误删） -->
+<div class="modal-mask" id="modalDelete">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚠️ 删除确认</h3>
+      <button class="icon-btn" style="background:var(--light-gray);border:1px solid var(--border);color:var(--text-secondary);width:30px;height:30px" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn" id="delWarn">确定要删除当前配方吗？此操作不可恢复。</div>
+      <div class="del-step" id="delStep">第 1 / 3 次确认</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-danger" id="btnConfirmDelete" disabled>确认删除</button>
     </div>
   </div>
 </div>
@@ -1229,7 +1310,63 @@
     renderIngredients(recipe);
   }
 
-  // ====== 导出备份 ======
+  // ====== 备份码编解码（复制粘贴式）======
+  var BACKUP_CODE_PREFIX = 'MBS1:';
+  function utf8ToB64(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function b64ToUtf8(b64){ return decodeURIComponent(escape(atob(b64))); }
+  function tryParse(str){ try { return JSON.parse(str); } catch(e){ return null; } }
+
+  // 生成可复制的备份码：前缀 + base64(JSON)
+  function buildBackupCode(){
+    var logoData = null;
+    try { logoData = localStorage.getItem(LOGO_KEY); } catch(e){}
+    var data = {
+      app: '蛮巴适产品配比计算器',
+      version: 1,
+      exportTime: new Date().toISOString(),
+      recipes: state.recipes,
+      currentId: state.currentId,
+      logo: logoData
+    };
+    return BACKUP_CODE_PREFIX + utf8ToB64(JSON.stringify(data));
+  }
+
+  // 解析备份码：兼容 前缀+base64（新版）、纯 base64、以及旧版纯 JSON 文件
+  function parseBackupCode(raw){
+    if(!raw) return null;
+    var s = String(raw).replace(/\s+/g, '');
+    if(s.indexOf(BACKUP_CODE_PREFIX) === 0) s = s.slice(BACKUP_CODE_PREFIX.length);
+    var data = tryParse(s) || tryParse(String(raw)); // 1) 直接 JSON（旧文件）
+    if(!data){
+      try { data = tryParse(b64ToUtf8(s)); } catch(e){} // 2) base64（新版备份码）
+    }
+    if(!data || !data.recipes || !Array.isArray(data.recipes) || data.recipes.length === 0) return null;
+    var valid = data.recipes.every(function(r){
+      return r && typeof r.name === 'string' && Array.isArray(r.ingredients);
+    });
+    if(!valid) return null;
+    return data;
+  }
+
+  // 应用导入数据（备份码与文件导入共用）
+  function applyImportData(data){
+    state.recipes = data.recipes;
+    state.currentId = data.currentId && getRecipeById(state.recipes, data.currentId) ? data.currentId : state.recipes[0].id;
+    state.lockedIndex = 0;
+    state.editMode = false;
+    state.dirty = false;
+    save();
+    if(data.logo){
+      try { localStorage.setItem(LOGO_KEY, data.logo); setLogoImage(data.logo); } catch(e){}
+    }
+    applyRole();
+    renderRecipeSelect();
+    renderCurrent();
+    dirtyHint.style.display = 'none';
+    toast('备份导入成功，共 ' + data.recipes.length + ' 套配方');
+  }
+
+  // ====== 导出备份（下载文件，作为备选）======
   function exportBackup(){
     var logoData = null;
     try { logoData = localStorage.getItem(LOGO_KEY); } catch(e){}
@@ -1257,45 +1394,14 @@
     toast('备份已导出：' + filename);
   }
 
-  // ====== 导入备份 ======
+  // ====== 导入备份（文件，作为备选）======
   function importBackup(file){
     var reader = new FileReader();
     reader.onload = function(e){
-      try {
-        var data = JSON.parse(e.target.result);
-        if(!data || !data.recipes || !Array.isArray(data.recipes) || data.recipes.length === 0){
-          toast('备份文件格式无效');
-          return;
-        }
-        // 基本校验每条配方
-        var valid = data.recipes.every(function(r){
-          return r && typeof r.name === 'string' && Array.isArray(r.ingredients);
-        });
-        if(!valid){ toast('备份数据不合法'); return; }
-
-        if(!confirm('将导入 ' + data.recipes.length + ' 套配方，会覆盖当前所有数据，确定导入？')) return;
-
-        state.recipes = data.recipes;
-        state.currentId = data.currentId && getRecipeById(state.recipes, data.currentId) ? data.currentId : state.recipes[0].id;
-        state.lockedIndex = 0;
-        state.editMode = false;
-        state.dirty = false;
-        save();
-        // 恢复 Logo
-        if(data.logo){
-          try {
-            localStorage.setItem(LOGO_KEY, data.logo);
-            setLogoImage(data.logo);
-          } catch(e){}
-        }
-        applyRole();
-        renderRecipeSelect();
-        renderCurrent();
-        dirtyHint.style.display = 'none';
-        toast('备份导入成功，共 ' + data.recipes.length + ' 套配方');
-      } catch(err){
-        toast('读取失败：' + err.message);
-      }
+      var data = parseBackupCode(e.target.result);
+      if(!data){ toast('备份文件格式无效'); return; }
+      if(!confirm('将导入 ' + data.recipes.length + ' 套配方，会覆盖当前所有数据，确定导入？')) return;
+      applyImportData(data);
     };
     reader.onerror = function(){ toast('文件读取失败'); };
     reader.readAsText(file);
@@ -1436,37 +1542,96 @@
       toast('配方已保存');
     });
 
-    // 删除配方
+    // 删除配方（三次提醒倒计时，防误删）
+    var delTimer = null, delStep = 0;
+    function clearDelTimer(){ if(delTimer){ clearInterval(delTimer); delTimer = null; } }
+    function startDelCountdown(){
+      delStep = 1;
+      runDelStep();
+    }
+    function runDelStep(){
+      var btn = $('btnConfirmDelete');
+      var secs = 3;
+      btn.disabled = true;
+      btn.textContent = '请等待 ' + secs + ' 秒…';
+      $('delStep').textContent = '第 ' + delStep + ' / 3 次确认';
+      var r = getRecipe(state.currentId);
+      $('delWarn').textContent = '即将删除配方「' + (r ? r.name : '') + '」，此操作不可恢复！';
+      clearDelTimer();
+      delTimer = setInterval(function(){
+        secs--;
+        if(secs <= 0){
+          clearDelTimer();
+          btn.disabled = false;
+          btn.textContent = '确认删除（第 ' + delStep + ' 次）';
+        } else {
+          btn.textContent = '请等待 ' + secs + ' 秒…';
+        }
+      }, 1000);
+    }
     $('btnDelete').addEventListener('click', function(){
       var recipe = getRecipe(state.currentId);
       if(!recipe) return;
       if(recipe.builtin){ toast('内置配方不可删除'); return; }
       if(state.recipes.length <= 1){ toast('至少保留一套配方'); return; }
-      if(!confirm('确定删除配方「'+recipe.name+'」？此操作不可恢复。')) return;
-      var idx = state.recipes.indexOf(recipe);
-      state.recipes.splice(idx, 1);
-      state.currentId = state.recipes[Math.max(0, idx-1)].id;
-      state.lockedIndex = 0;
-      save();
-      renderRecipeSelect();
-      renderCurrent();
+      showModal('modalDelete');
+      startDelCountdown();
+    });
+    $('btnConfirmDelete').addEventListener('click', function(){
+      if(delStep < 3){
+        delStep++;
+        runDelStep();
+        return;
+      }
+      // 第三次确认：执行删除
+      clearDelTimer();
+      var recipe = getRecipe(state.currentId);
+      if(recipe){
+        var idx = state.recipes.indexOf(recipe);
+        state.recipes.splice(idx, 1);
+        state.currentId = state.recipes[Math.max(0, idx-1)].id;
+        state.lockedIndex = 0;
+        save();
+        renderRecipeSelect();
+        renderCurrent();
+      }
+      hideModal('modalDelete');
       toast('已删除');
     });
 
-    // 导出备份
-    $('btnExport').addEventListener('click', function(){
-      if(state.recipes.length === 0){ toast('暂无配方可导出'); return; }
-      exportBackup();
-    });
-
-    // 导入备份
-    $('btnImport').addEventListener('click', function(){
-      $('importFile').click();
+    // 备份与恢复（合并的导出/导入入口）
+    function openBackupModal(){
+      $('backupCode').value = buildBackupCode();
+      $('importCode').value = '';
+      showModal('modalBackup');
+    }
+    $('btnBackup').addEventListener('click', function(){
+      openBackupModal();
     });
     $('importFile').addEventListener('change', function(e){
       var file = e.target.files[0];
       if(file){ importBackup(file); }
       e.target.value = ''; // 允许重复导入同一文件
+    });
+    // 备份弹窗内的按钮
+    $('btnCopyBackup').addEventListener('click', function(){
+      copyText($('backupCode').value);
+      toast('备份码已复制');
+    });
+    $('btnDownloadBackup').addEventListener('click', function(){
+      if(state.recipes.length === 0){ toast('暂无配方可导出'); return; }
+      exportBackup();
+    });
+    $('btnDoImport').addEventListener('click', function(){
+      var raw = $('importCode').value;
+      var data = parseBackupCode(raw);
+      if(!data){ toast('备份码无效，请检查是否完整复制'); return; }
+      if(!confirm('将导入 ' + data.recipes.length + ' 套配方，会覆盖当前所有数据，确定导入？')) return;
+      applyImportData(data);
+      hideModal('modalBackup');
+    });
+    $('btnImportFile2').addEventListener('click', function(){
+      $('importFile').click();
     });
 
     // 分享
