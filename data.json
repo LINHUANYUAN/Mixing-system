@@ -1,6 +1,6 @@
 {
-  "version": 1787495772452,
-  "adminKeyHash": "73d334f3",
+  "version": 1787495909321,
+  "adminKeyHash": "",
   "recipes": [
     {
       "id": "lvdousha",
@@ -24,6 +24,44 @@
           "amount": 9000
         }
       ]
+    },
+    {
+      "id": "r_mt5ipzxz_702je",
+      "name": "港式冻柠茶",
+      "builtin": false,
+      "ingredients": [
+        {
+          "name": "红茶",
+          "amount": 50
+        },
+        {
+          "name": "开水90℃",
+          "amount": 1500
+        },
+        {
+          "name": "冰块",
+          "amount": 750
+        }
+      ]
+    },
+    {
+      "id": "r_mt5irt1x_kzfz5",
+      "name": "茉莉香柠茶",
+      "builtin": false,
+      "ingredients": [
+        {
+          "name": "绿茶",
+          "amount": 1
+        },
+        {
+          "name": "开水75℃",
+          "amount": 30
+        },
+        {
+          "name": "冰块",
+          "amount": 15
+        }
+      ]
     }
   ],
   "employees": [
@@ -33,5 +71,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-08-23T14:36:12.452Z"
+  "publishedAt": "2026-08-23T14:38:29.321Z"
 }
