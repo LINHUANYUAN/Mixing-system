@@ -827,10 +827,7 @@
       <div class="form-group">
         <label>分支</label>
         <input type="text" class="form-input" id="cfgBranch" placeholder="main">
-      </div>
-      <div class="form-group">
-        <label>存放路径（留空为根目录）</label>
-        <input type="text" class="form-input" id="cfgPath" placeholder="如：data">
+        <p class="form-hint">仓库默认分支可在 GitHub 仓库页左上角查看，通常为 main</p>
       </div>
       <div class="form-group">
         <label>GitHub 令牌（需 repo 写权限）</label>
@@ -844,6 +841,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-ghost" id="btnTestCloud">🔌 测试连接</button>
       <button class="btn btn-primary" id="btnSaveCloud">保存并发布</button>
     </div>
   </div>
@@ -1010,12 +1008,12 @@
   function genId(){
     return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
   }
-  function toast(msg){
+  function toast(msg, ms){
     var t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(t._timer);
-    t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2000);
+    t._timer = setTimeout(function(){ t.classList.remove('show'); }, ms || 2000);
   }
   function showModal(id){ $(id).classList.add('show'); }
   function hideModal(id){ $(id).classList.remove('show'); }
@@ -1798,6 +1796,7 @@
 
     // 云端设置弹窗内按钮
     var bsc = $('btnSaveCloud'); if(bsc) bsc.addEventListener('click', function(){ saveCloudSettings(); });
+    var btc = $('btnTestCloud'); if(btc) btc.addEventListener('click', function(){ testCloudConnection(); });
 
     // 模态框关闭
     document.querySelectorAll('[data-close]').forEach(function(el){
@@ -1867,23 +1866,58 @@
       .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .catch(function(){ return null; });
   }
-  function githubApi(cfg, path, method, body){
-    var url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + path;
+  function githubApi(cfg, apiPath, method, body){
+    var url = 'https://api.github.com/repos/' + encodeURIComponent(cfg.owner) + '/' + encodeURIComponent(cfg.repo) + apiPath;
     var opts = { method: method, headers: { 'Authorization': 'token ' + cfg.token, 'Accept': 'application/vnd.github.v3+json' } };
     if(body) opts.body = JSON.stringify(body);
     return fetch(url, opts).then(function(r){
-      if(!r.ok) throw new Error('GitHub API ' + r.status);
-      return r.json();
+      return r.text().then(function(txt){
+        var data = null;
+        try { data = JSON.parse(txt); } catch(e){}
+        if(!r.ok){
+          var gm = (data && data.message) ? String(data.message) : ('HTTP ' + r.status);
+          var err = new Error('GitHub ' + r.status + '：' + gm);
+          err.status = r.status;
+          err.apiMessage = gm;
+          throw err;
+        }
+        return data;
+      });
     });
   }
-  function getFileSha(cfg, path){
-    return githubApi(cfg, path, 'GET').then(function(info){ return info.sha; })
-      .catch(function(){ return null; }); // 404 → 新建
+  // 容错解析：允许用户直接粘贴仓库完整 URL 或 "owner/repo"
+  function parseRepoInput(owner, repo){
+    var s = ((owner || '') + '/' + (repo || '')).replace(/\\/g, '/');
+    var m = s.match(/github\.com\/([^\/?#]+)\/([^\/?#]+)/i);
+    if(m) return { owner: m[1], repo: m[2].replace(/\.git$/, '') };
+    var parts = s.split('/').map(function(x){ return x.trim(); }).filter(Boolean);
+    if(parts.length >= 2) return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') };
+    return { owner: (owner || '').trim(), repo: (repo || '').trim() };
   }
-  function putFile(cfg, path, content, sha){
+  function encodePath(p){
+    return p.split('/').map(encodeURIComponent).join('/');
+  }
+  function cloudErrMsg(err){
+    if(!err) return '未知错误';
+    if(err.status === 401) return '令牌无效或已过期（401）：请到 GitHub 重新生成令牌，再到「⚙ 云端设置」更新';
+    if(err.status === 404) return '仓库不存在或令牌无权访问（404）：请检查 ①仓库拥有者/仓库名拼写（区分大小写）②若是 Fine-grained 令牌，必须在该令牌设置里勾选了这个仓库 ③Classic 令牌必须勾选 repo 权限';
+    if(err.status === 403) return '令牌权限不足（403）：Fine-grained 令牌需开 Contents: Read and write；Classic 令牌需勾选 repo';
+    if(err.status === 409) return '云端文件冲突（409）：data.json 刚被更新过，请再点一次「发布同步」';
+    if(err.status === 422) return '请求被拒（422）：多半是分支名不存在，请确认分支名（在 GitHub 仓库页左上角可看默认分支）';
+    return (err && err.message) ? err.message : String(err);
+  }
+  function checkRepoAccess(cfg){
+    return githubApi(cfg, '', 'GET'); // 返回仓库信息（含 default_branch）
+  }
+  function getFileSha(cfg, apiPath){
+    return githubApi(cfg, apiPath, 'GET').then(function(info){ return info.sha; })
+      .catch(function(err){ if(err.status === 404) return null; throw err; }); // 404=文件尚不存在，新建
+  }
+  function putFile(cfg, apiPath, content, sha, branch){
     var body = { message: 'sync recipes ' + new Date().toISOString(), content: content };
     if(sha) body.sha = sha;
-    return githubApi(cfg, path, 'PUT', body);
+    if(branch) body.branch = branch;
+    return githubApi(cfg, apiPath, 'PUT', body);
   }
   function publishCloud(){
     var cfg = loadCloudCfg();
@@ -1892,7 +1926,8 @@
       openCloudSettings();
       return;
     }
-    var filePath = (cfg.path ? cfg.path.replace(/\/$/, '') + '/' : '') + CLOUD_FILE;
+    var dir = (cfg.path || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    var filePath = (dir ? dir + '/' : '') + CLOUD_FILE;
     var data = {
       version: Date.now(),
       adminKeyHash: state.adminKeyHash || '',
@@ -1901,12 +1936,15 @@
       publishedAt: new Date().toISOString()
     };
     var content = utf8ToB64(JSON.stringify(data, null, 2));
-    getFileSha(cfg, filePath).then(function(sha){
-      return putFile(cfg, filePath, content, sha);
+    checkRepoAccess(cfg).then(function(repo){
+      var branch = cfg.branch || repo.default_branch;
+      return getFileSha(cfg, '/contents/' + encodePath(filePath) + '?ref=' + encodeURIComponent(branch)).then(function(sha){
+        return putFile(cfg, '/contents/' + encodePath(filePath), content, sha, branch);
+      });
     }).then(function(){
       toast('已发布到云端 ✅ 员工端可同步');
     }).catch(function(err){
-      toast('发布失败：' + (err && err.message ? err.message : err));
+      toast('发布失败：' + cloudErrMsg(err), 6000);
     });
   }
 
@@ -2025,20 +2063,48 @@
     $('cfgOwner').value = cfg.owner || '';
     $('cfgRepo').value = cfg.repo || '';
     $('cfgBranch').value = cfg.branch || 'main';
-    $('cfgPath').value = cfg.path || '';
     $('cfgToken').value = cfg.token || '';
     $('cfgPass').value = '';
     showModal('modalCloud');
   }
-  function saveCloudSettings(){
-    var owner = $('cfgOwner').value.trim();
-    var repo = $('cfgRepo').value.trim();
+  // 测试连接：逐项诊断 owner/repo/令牌，给出人话报错
+  function testCloudConnection(){
+    var parsed = parseRepoInput($('cfgOwner').value, $('cfgRepo').value);
+    var owner = parsed.owner, repo = parsed.repo;
     var branch = $('cfgBranch').value.trim() || 'main';
-    var path = $('cfgPath').value.trim();
+    var token = $('cfgToken').value.trim();
+    if(!owner || !repo || !token){ toast('请先填写仓库拥有者、仓库名与令牌', 3000); return; }
+    $('cfgOwner').value = owner;
+    $('cfgRepo').value = repo;
+    var btn = $('btnTestCloud');
+    var old = btn.textContent;
+    btn.disabled = true; btn.textContent = '测试中…';
+    var cfg = { owner: owner, repo: repo, branch: branch, path: '', token: token };
+    checkRepoAccess(cfg).then(function(info){
+      var db = info.default_branch || 'main';
+      if(branch !== db){
+        toast('✅ 仓库可访问！注意：仓库默认分支是「' + db + '」，你填的是「' + branch + '」，发布将使用你填的分支，请确认它存在', 5000);
+      } else {
+        toast('✅ 连接成功！仓库可访问，默认分支：' + db + '，可以保存并发布了', 4000);
+      }
+    }).catch(function(err){
+      toast('❌ ' + cloudErrMsg(err), 7000);
+    }).then(function(){
+      btn.disabled = false; btn.textContent = old;
+    });
+  }
+  function saveCloudSettings(){
+    var parsed = parseRepoInput($('cfgOwner').value, $('cfgRepo').value);
+    var owner = parsed.owner;
+    var repo = parsed.repo;
+    var branch = $('cfgBranch').value.trim() || 'main';
     var token = $('cfgToken').value.trim();
     var pass = $('cfgPass').value;
-    if(!owner || !repo || !token){ toast('请填写仓库拥有者、仓库名与令牌'); return; }
-    saveCloudCfg({ owner: owner, repo: repo, branch: branch, path: path, token: token });
+    if(!owner || !repo || !token){ toast('请填写仓库拥有者（或直接粘贴仓库网址）、仓库名与令牌'); return; }
+    // 回填纠正后的 owner/repo（用户可能粘贴了完整 URL）
+    $('cfgOwner').value = owner;
+    $('cfgRepo').value = repo;
+    saveCloudCfg({ owner: owner, repo: repo, branch: branch, path: '', token: token });
     if(!state.adminKeyHash){
       if(!pass){ toast('首次设置请填写管理密码'); return; }
       state.adminKeyHash = hashStr(pass);
