@@ -554,10 +554,36 @@
   }
   .del-step { margin-top: 10px; color: var(--text-muted); font-size: 13px; text-align: center; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ===== 员工端同步状态 ===== */
+  .sync-status { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  .header-actions .sync-status { order: -1; }
+  /* 身份徽章：仅展示，不可点击切换 */
+  .role-badge { cursor: default; }
+  .role-badge:active { background: rgba(255,255,255,0.08); }
+
+  /* ===== 员工管理 / 云端设置 ===== */
+  .emp-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 10px; }
+  .emp-info { min-width: 0; flex: 1; }
+  .emp-name { font-weight: 600; font-size: 15px; color: var(--text); }
+  .emp-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; word-break: break-all; }
+  .emp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .badge-on { color: #1a9e57; font-weight: 600; }
+  .badge-off { color: #d23b3b; font-weight: 600; }
+  .admin-link-box { background: var(--light-gray); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; word-break: break-all; color: var(--text-secondary); margin: 10px 0; }
+  .form-hint { font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-top: 6px; }
+  .link-out { color: var(--primary); text-decoration: underline; cursor: pointer; }
+
+  /* ===== 离职 / 停用 全屏 ===== */
+  .revoked-screen { position: fixed; inset: 0; background: #1b1f2e; display: none; align-items: center; justify-content: center; z-index: 9999; }
+  .revoked-card { text-align: center; color: #fff; padding: 30px; max-width: 360px; }
+  .revoked-icon { font-size: 54px; margin-bottom: 12px; }
+  .revoked-card h2 { font-size: 22px; margin: 0 0 10px; }
+  .revoked-card p { color: #c8cee5; font-size: 14px; line-height: 1.6; }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <!-- 顶部栏 -->
   <div class="header">
     <div class="brand">
@@ -567,8 +593,10 @@
       <div class="brand-title">蛮巴适产品配比计算器</div>
     </div>
     <div class="header-actions">
-      <button class="role-badge" id="roleBadge" title="点击切换身份">员工</button>
-      <button class="icon-btn" id="btnShare" title="分享" aria-label="分享">⤴</button>
+      <span class="sync-status" id="syncStatus"></span>
+      <button class="icon-btn" id="btnSync" title="同步配方" aria-label="同步">🔄</button>
+      <span class="role-badge" id="roleBadge" title="员工只读模式">👤 员工</span>
+      <button class="icon-btn" id="btnShare" title="分享 / 员工管理" aria-label="分享">⤴</button>
     </div>
   </div>
 
@@ -600,6 +628,9 @@
       <button class="btn btn-ghost btn-sm" id="btnNewRecipe">＋ 新建配方</button>
       <button class="btn btn-ghost btn-sm" id="btnAddIng">＋ 添加原料</button>
       <button class="btn btn-ghost btn-sm" id="btnEditBase">✎ 编辑基准</button>
+      <button class="btn btn-ghost btn-sm" id="btnPublish">☁ 发布同步</button>
+      <button class="btn btn-ghost btn-sm" id="btnEmpMgr">👥 员工管理</button>
+      <button class="btn btn-ghost btn-sm" id="btnCloudSet">⚙ 云端设置</button>
     </div>
 
     <div class="hint" id="hintBox">
@@ -768,6 +799,86 @@
 <div class="toast" id="toast"></div>
 <div class="fatal-error" id="fatalError" style="display:none"></div>
 
+<!-- 离职 / 停用 全屏 -->
+<div class="revoked-screen" id="revokedScreen" style="display:none">
+  <div class="revoked-card">
+    <div class="revoked-icon">🔒</div>
+    <h2>访问已关闭</h2>
+    <p id="revokedMsg"></p>
+  </div>
+</div>
+
+<!-- 云端设置（管理员） -->
+<div class="modal-mask" id="modalCloud">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>云端设置</h3>
+      <button class="icon-btn" style="background:var(--light-gray);border:1px solid var(--border);color:var(--text-secondary);width:30px;height:30px" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>GitHub 仓库拥有者</label>
+        <input type="text" class="form-input" id="cfgOwner" placeholder="如：your-name">
+      </div>
+      <div class="form-group">
+        <label>仓库名</label>
+        <input type="text" class="form-input" id="cfgRepo" placeholder="如：mixing-system">
+      </div>
+      <div class="form-group">
+        <label>分支</label>
+        <input type="text" class="form-input" id="cfgBranch" placeholder="main">
+      </div>
+      <div class="form-group">
+        <label>存放路径（留空为根目录）</label>
+        <input type="text" class="form-input" id="cfgPath" placeholder="如：data">
+      </div>
+      <div class="form-group">
+        <label>GitHub 令牌（需 repo 写权限）</label>
+        <input type="password" class="form-input" id="cfgToken" placeholder="ghp_xxxxxxxx">
+      </div>
+      <div class="form-group">
+        <label>管理密码（首次必填，之后可改）</label>
+        <input type="password" class="form-input" id="cfgPass" placeholder="设置管理端入口密码">
+      </div>
+      <p class="form-hint">令牌仅保存在你本机浏览器，不会发给员工。配置后点保存即可发布初始数据到云端 data.json，员工端链接打开后会自动同步配方与名单。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-primary" id="btnSaveCloud">保存并发布</button>
+    </div>
+  </div>
+</div>
+
+<!-- 员工管理（管理员） -->
+<div class="modal-mask" id="modalEmp">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>员工管理</h3>
+      <button class="icon-btn" style="background:var(--light-gray);border:1px solid var(--border);color:var(--text-secondary);width:30px;height:30px" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>添加员工</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="form-input" id="empName" placeholder="员工姓名 / 编号" maxlength="20" style="flex:1">
+          <button class="btn btn-primary btn-sm" id="btnAddEmp">添加</button>
+        </div>
+      </div>
+      <div id="empList"></div>
+      <div class="form-group" style="margin-top:16px">
+        <label>管理员链接</label>
+        <div class="admin-link-box" id="adminLink"></div>
+        <button class="btn btn-ghost btn-sm btn-block" id="btnCopyAdminLink">复制管理员链接</button>
+      </div>
+      <p class="form-hint">点击「停用」后务必点下方「发布同步」生效，离职员工打开链接将立即显示「访问已关闭」。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>关闭</button>
+      <button class="btn btn-primary" id="btnPublishFromEmp">☁ 发布同步</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   'use strict';
@@ -781,6 +892,21 @@
   var PARAM_ROLE = 'role';
   var ROLE_ADMIN = 'admin';
   var ROLE_STAFF = 'staff';
+
+  // ====== 云端同步（GitHub Pages + GitHub API 当后端）======
+  var CLOUD_FILE = 'data.json';        // 与页面同仓库，员工端用相对路径 ./data.json 拉取（同源）
+  var ADMIN_SESSION_KEY = 'recipe_admin_session';
+  var CLOUD_CFG_KEY = 'recipe_cloud_cfg_v1';
+  var EMP_KEY = 'recipe_employees_v1';
+  var AUTO_SYNC_SEC = 60;              // 员工端自动同步间隔（秒）
+
+  // 简易字符串哈希（用于管理密码，仅防随手查看，非加密级）
+  function hashStr(s){
+    s = String(s);
+    var h = 5381;
+    for(var i=0;i<s.length;i++){ h = ((h<<5)+h) ^ s.charCodeAt(i); }
+    return (h>>>0).toString(16);
+  }
 
   // ====== 预置配方（仅绿豆沙） ======
   var DEFAULT_RECIPES = [
@@ -827,12 +953,18 @@
 
   // ====== 状态 ======
   var state = {
+    mode: 'employee',      // 'admin' | 'employee'
+    empId: null,           // 员工链接携带的ID（访客模式为 null）
     role: ROLE_STAFF,
     recipes: [],
     currentId: null,
     lockedIndex: 0,
     editMode: false,
-    dirty: false
+    dirty: false,
+    employees: [],         // 员工名单（管理员维护，发布到云端）
+    adminKeyHash: '',      // 管理密码哈希（存于云端 data.json）
+    cloudVersion: 0,       // 云端数据版本，用于判断是否需要重渲染
+    setupMode: false       // 是否为首次设置向导
   };
 
   // ====== DOM ======
@@ -848,6 +980,9 @@
   var bottomBar    = $('bottomBar');
   var statCount    = $('statCount');
   var statTotal    = $('statTotal');
+  var btnShare     = $('btnShare');
+  var btnSync      = $('btnSync');
+  var syncStatus   = $('syncStatus');
 
   // ====== 工具函数 ======
   function getParam(name){
@@ -895,46 +1030,65 @@
     if(window.console) console.error(err);
   }
 
-  // ====== 初始化 ======
-  function init(){
-   try {
-    var r = getParam(PARAM_ROLE);
-    state.role = (r === ROLE_STAFF) ? ROLE_STAFF : ROLE_ADMIN;
-
+  // ====== 本地数据加载（管理员以此为基准，员工端会被云端覆盖）======
+  function loadLocal(){
     var saved = load();
     var storedVer = 0;
     try { storedVer = parseInt(localStorage.getItem(STORAGE_VERSION_KEY) || '0', 10) || 0; } catch(e){}
-
     if(saved && saved.recipes && saved.recipes.length && storedVer >= PRESET_VERSION){
-      // 已有本地数据且共享预设未更新：沿用用户自己的状态
       state.recipes = migrateRecipes(saved.recipes);
       state.currentId = saved.currentId || (state.recipes[0] && state.recipes[0].id);
-      save();
     } else {
-      // 首次访问，或共享预设已更新：以 PRESET_RECIPES 为基准
       var base = JSON.parse(JSON.stringify(PRESET_RECIPES));
-      // 保留用户此前自建的配方，避免更新预设时把自建配方冲掉
       if(saved && saved.recipes){
         saved.recipes.forEach(function(r){ if(!r.builtin) base.push(r); });
       }
       state.recipes = migrateRecipes(base);
       state.currentId = (saved && saved.currentId && getRecipeById(state.recipes, saved.currentId))
         ? saved.currentId : (state.recipes[0] && state.recipes[0].id);
-      save();
       try { localStorage.setItem(STORAGE_VERSION_KEY, String(PRESET_VERSION)); } catch(e){}
     }
     if(!state.currentId || !getRecipeById(state.recipes, state.currentId)){
       state.currentId = state.recipes[0] && state.recipes[0].id;
     }
+  }
 
+  function loadEmployees(){
+    try {
+      var e = JSON.parse(localStorage.getItem(EMP_KEY) || '[]');
+      state.employees = Array.isArray(e) ? e : [];
+    } catch(e){ state.employees = []; }
+  }
+
+  // ====== 初始化 ======
+  function init(){
+   try {
+    loadLocal();
+    loadEmployees();
+    state.mode = 'employee'; // 默认安全：员工只读模式
+    bindEvents();
+    // 先渲染一个可用的页面（员工视图），避免空白
     applyRole();
     renderRecipeSelect();
     renderCurrent();
     loadLogo();
-    bindEvents();
+
+    var empParam = getParam('emp');
+    var adminParam = getParam('admin');
+    fetchCloud().then(function(cloud){ routeMode(empParam, adminParam, cloud); })
+                .catch(function(){ routeMode(empParam, adminParam, null); });
    } catch(err){
     showFatal(err);
    }
+  }
+
+  // 根据参数与云端数据决定进入哪种模式
+  function routeMode(empParam, adminParam, cloud){
+    if(adminParam){
+      enterAdminGate(cloud);
+    } else {
+      enterEmployee(empParam, cloud);
+    }
   }
 
   // ====== Logo 自定义 ======
@@ -992,12 +1146,16 @@
   }
 
   function applyRole(){
-    var isAdmin = state.role === ROLE_ADMIN;
-    roleBadge.innerHTML = isAdmin ? '🛠 管理员 ⇄' : '👤 员工 ⇄';
-    roleBadge.title = isAdmin ? '当前：管理员，点击切换为员工' : '当前：员工，点击切换为管理员';
+    var isAdmin = state.mode === 'admin';
+    roleBadge.innerHTML = isAdmin ? '🛠 管理员' : '👤 员工';
+    roleBadge.title = isAdmin ? '管理员模式' : '员工只读模式（可在预设基础上调整数值看比例）';
     roleBadge.classList.toggle('admin', isAdmin);
     adminToolbar.style.display = isAdmin ? 'flex' : 'none';
     bottomBar.classList.toggle('show', isAdmin);
+    // 员工端：隐藏分享按钮，显示同步按钮与状态；管理端反之
+    if(btnShare) btnShare.style.display = isAdmin ? '' : 'none';
+    if(btnSync) btnSync.style.display = isAdmin ? 'none' : '';
+    if(syncStatus) syncStatus.style.display = isAdmin ? 'none' : '';
     if(!isAdmin) state.editMode = false;
     updateEditBtn();
     updateHint();
@@ -1013,20 +1171,11 @@
     dirtyHint.style.display = 'none';
   }
 
-  function toggleRole(){
-    if(state.editMode && state.dirty){
-      if(!confirm('有未保存的修改，切换身份将丢失，确定切换？')) return;
-      restoreSavedData();
-    }
-    state.editMode = false;
-    state.role = (state.role === ROLE_ADMIN) ? ROLE_STAFF : ROLE_ADMIN;
-    applyRole();
-    renderCurrent();
-    toast(state.role === ROLE_ADMIN ? '已切换为管理员' : '已切换为员工');
-  }
+  // 注：身份不再通过点击徽章切换（旧 toggleRole 已移除），避免员工端误进管理端。
+  // 管理端入口为 ?admin=1 + 密码；员工端为 ?emp=ID 或默认只读。
 
   function updateHint(){
-    var isAdmin = state.role === ROLE_ADMIN;
+    var isAdmin = state.mode === 'admin';
     if(!isAdmin){
       hintBox.textContent = '当前为只读模式：可切换配方、执行换算。修改数值后点击 ✓ 或按回车确认换算，不能保存基准。';
     } else if(state.editMode){
@@ -1096,7 +1245,7 @@
   }
 
   function renderIngredients(recipe){
-    var isAdmin = state.role === ROLE_ADMIN;
+    var isAdmin = state.mode === 'admin';
     var editMode = isAdmin && state.editMode;
     var html = '';
     if(state.lockedIndex >= recipe.ingredients.length) state.lockedIndex = 0;
@@ -1236,7 +1385,7 @@
 
   function markDirty(){
     state.dirty = true;
-    if(state.role === ROLE_ADMIN) dirtyHint.style.display = 'block';
+    if(state.mode === 'admin') dirtyHint.style.display = 'block';
   }
 
   function escapeHtml(s){
@@ -1284,7 +1433,7 @@
     }
 
     state.dirty = true;
-    if(state.role === ROLE_ADMIN) dirtyHint.style.display = 'block';
+    if(state.mode === 'admin') dirtyHint.style.display = 'block';
     renderIngredients(recipe);
     toast('已按比例换算');
   }
@@ -1432,12 +1581,9 @@
       flashCard();
     });
 
-    // 角色切换
-    $('roleBadge').addEventListener('click', toggleRole);
-
     // Logo 上传（管理员可上传自定义Logo，员工点击无效）
     $('brandLogo').addEventListener('click', function(){
-      if(state.role !== ROLE_ADMIN){
+      if(state.mode !== 'admin'){
         toast('仅管理员可上传Logo');
         return;
       }
@@ -1451,7 +1597,7 @@
 
     // 编辑基准模式
     $('btnEditBase').addEventListener('click', function(){
-      if(state.role !== ROLE_ADMIN) return;
+      if(state.mode !== 'admin') return;
       var recipe = getRecipe(state.currentId);
       if(!recipe) return;
       if(!state.editMode){
@@ -1634,15 +1780,24 @@
       $('importFile').click();
     });
 
-    // 分享
-    $('btnShare').addEventListener('click', function(){
-      var base = location.origin + location.pathname;
-      $('shareLinkEmp').textContent   = base + '?role=staff';
-      $('shareLinkAdmin').textContent = base;
-      showModal('modalShare');
-    });
-    $('btnCopyEmp').addEventListener('click', function(){ copyText($('shareLinkEmp').textContent); });
-    $('btnCopyAdmin').addEventListener('click', function(){ copyText($('shareLinkAdmin').textContent); });
+    // 分享 / 员工管理（管理员）
+    $('btnShare').addEventListener('click', function(){ openEmpModal(); });
+
+    // 员工端同步按钮
+    if(btnSync) btnSync.addEventListener('click', function(){ doSync(false); });
+
+    // 管理端：发布同步 / 员工管理 / 云端设置
+    var bp = $('btnPublish'); if(bp) bp.addEventListener('click', function(){ publishCloud(); });
+    var bem = $('btnEmpMgr'); if(bem) bem.addEventListener('click', function(){ openEmpModal(); });
+    var bcs = $('btnCloudSet'); if(bcs) bcs.addEventListener('click', function(){ openCloudSettings(); });
+
+    // 员工管理弹窗内按钮
+    var bae = $('btnAddEmp'); if(bae) bae.addEventListener('click', function(){ addEmp(); });
+    var bcal = $('btnCopyAdminLink'); if(bcal) bcal.addEventListener('click', function(){ copyText($('adminLink').textContent); });
+    var bpfe = $('btnPublishFromEmp'); if(bpfe) bpfe.addEventListener('click', function(){ publishCloud(); });
+
+    // 云端设置弹窗内按钮
+    var bsc = $('btnSaveCloud'); if(bsc) bsc.addEventListener('click', function(){ saveCloudSettings(); });
 
     // 模态框关闭
     document.querySelectorAll('[data-close]').forEach(function(el){
@@ -1692,6 +1847,289 @@
       card.classList.add('flash');
       setTimeout(function(){ card.classList.remove('flash'); }, 600);
     }
+  }
+
+  // ================= 云端同步 / 管理端 / 员工端 =================
+
+  // ---- 云端配置（仅管理员本机保存）----
+  function loadCloudCfg(){
+    try { return JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || 'null'); } catch(e){ return null; }
+  }
+  function saveCloudCfg(cfg){
+    try { localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cfg)); } catch(e){}
+  }
+
+  // ---- 拉取 / 发布 ----
+  function buildCloudUrl(){ return CLOUD_FILE + '?t=' + Date.now(); }
+  function fetchCloud(){
+    if(typeof fetch !== 'function') return Promise.resolve(null);
+    return fetch(buildCloudUrl(), { cache: 'no-store' })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .catch(function(){ return null; });
+  }
+  function githubApi(cfg, path, method, body){
+    var url = 'https://api.github.com/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + path;
+    var opts = { method: method, headers: { 'Authorization': 'token ' + cfg.token, 'Accept': 'application/vnd.github.v3+json' } };
+    if(body) opts.body = JSON.stringify(body);
+    return fetch(url, opts).then(function(r){
+      if(!r.ok) throw new Error('GitHub API ' + r.status);
+      return r.json();
+    });
+  }
+  function getFileSha(cfg, path){
+    return githubApi(cfg, path, 'GET').then(function(info){ return info.sha; })
+      .catch(function(){ return null; }); // 404 → 新建
+  }
+  function putFile(cfg, path, content, sha){
+    var body = { message: 'sync recipes ' + new Date().toISOString(), content: content };
+    if(sha) body.sha = sha;
+    return githubApi(cfg, path, 'PUT', body);
+  }
+  function publishCloud(){
+    var cfg = loadCloudCfg();
+    if(!cfg || !cfg.owner || !cfg.repo || !cfg.token){
+      toast('请先在「云端设置」填写 GitHub 仓库与令牌');
+      openCloudSettings();
+      return;
+    }
+    var filePath = (cfg.path ? cfg.path.replace(/\/$/, '') + '/' : '') + CLOUD_FILE;
+    var data = {
+      version: Date.now(),
+      adminKeyHash: state.adminKeyHash || '',
+      recipes: state.recipes,
+      employees: state.employees || [],
+      publishedAt: new Date().toISOString()
+    };
+    var content = utf8ToB64(JSON.stringify(data, null, 2));
+    getFileSha(cfg, filePath).then(function(sha){
+      return putFile(cfg, filePath, content, sha);
+    }).then(function(){
+      toast('已发布到云端 ✅ 员工端可同步');
+    }).catch(function(err){
+      toast('发布失败：' + (err && err.message ? err.message : err));
+    });
+  }
+
+  // ---- 员工查找 ----
+  function findEmp(list, id){
+    if(!list) return null;
+    for(var i=0;i<list.length;i++){ if(list[i].id === id) return list[i]; }
+    return null;
+  }
+
+  // ---- 模式路由 ----
+  function enterAdmin(){
+    var saved = load();
+    if(saved && saved.recipes && saved.recipes.length){ state.recipes = migrateRecipes(saved.recipes); }
+    if(!state.currentId || !getRecipeById(state.recipes, state.currentId)){
+      state.currentId = state.recipes[0] && state.recipes[0].id;
+    }
+    state.mode = 'admin';
+    state.setupMode = false;
+    state.empId = null;
+    applyRole(); renderRecipeSelect(); renderCurrent(); loadLogo();
+  }
+  function enterAdminGate(cloud){
+    var sessionOk = false;
+    try { sessionOk = sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'; } catch(e){}
+    if(sessionOk){ enterAdmin(); return; }
+    if(cloud && cloud.adminKeyHash){
+      var pwd = prompt('请输入管理密码：');
+      if(pwd === null){ enterEmployee(null, cloud); return; }
+      if(hashStr(pwd) === cloud.adminKeyHash){
+        state.adminKeyHash = cloud.adminKeyHash;
+        try { sessionStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch(e){}
+        enterAdmin();
+      } else {
+        toast('密码错误，已进入员工模式');
+        enterEmployee(null, cloud);
+      }
+    } else {
+      state.setupMode = true;
+      openCloudSettings();
+    }
+  }
+  function enterEmployee(empParam, cloud){
+    state.mode = 'employee';
+    state.empId = empParam || null;
+    state.setupMode = false;
+    if(cloud && cloud.recipes && cloud.recipes.length){
+      state.recipes = cloud.recipes;
+      state.employees = cloud.employees || [];
+      state.cloudVersion = cloud.version || 0;
+      if(state.empId){
+        var emp = findEmp(state.employees, state.empId);
+        if(!emp || emp.disabled){ showRevoked(emp); return; }
+      }
+      if(!getRecipeById(state.recipes, state.currentId)){
+        state.currentId = state.recipes[0] && state.recipes[0].id;
+      }
+      save();
+    } else {
+      state.employees = state.employees || [];
+      if(!getRecipeById(state.recipes, state.currentId)){
+        state.currentId = state.recipes[0] && state.recipes[0].id;
+      }
+    }
+    applyRole(); renderRecipeSelect(); renderCurrent(); loadLogo();
+    updateSyncStatus();
+    startAutoSync();
+  }
+  function showRevoked(emp){
+    try { document.getElementById('app').style.display = 'none'; } catch(e){}
+    var box = $('revokedScreen');
+    if(box) box.style.display = 'flex';
+    var msg = $('revokedMsg');
+    if(msg) msg.textContent = (emp && emp.name ? '员工「' + emp.name + '」的' : '该') + '访问已被停用。如有疑问请联系管理员。';
+  }
+
+  // ---- 同步 ----
+  var syncTimer = null;
+  function startAutoSync(){
+    if(syncTimer){ clearInterval(syncTimer); }
+    syncTimer = setInterval(function(){
+      if(state.mode === 'employee'){ doSync(true); }
+    }, AUTO_SYNC_SEC * 1000);
+  }
+  function doSync(silent){
+    return fetchCloud().then(function(cloud){
+      if(!cloud){ if(!silent) toast('云端暂不可达'); return; }
+      if(state.mode !== 'employee') return;
+      if(state.empId){
+        var emp = findEmp(cloud.employees || [], state.empId);
+        if(!emp || emp.disabled){ showRevoked(emp); return; }
+      }
+      if(cloud.version && cloud.version === state.cloudVersion){ updateSyncStatus(); return; }
+      state.cloudVersion = cloud.version || 0;
+      state.recipes = cloud.recipes || state.recipes;
+      state.employees = cloud.employees || [];
+      if(!getRecipeById(state.recipes, state.currentId)){
+        state.currentId = state.recipes[0] && state.recipes[0].id;
+      }
+      save();
+      renderRecipeSelect(); renderCurrent(); updateSyncStatus();
+      if(!silent) toast('已同步');
+    }).catch(function(){ if(!silent) toast('同步失败'); });
+  }
+  function updateSyncStatus(){
+    if(!syncStatus) return;
+    if(state.mode !== 'employee'){ syncStatus.textContent = ''; return; }
+    var d = new Date();
+    var hh = ('0'+d.getHours()).slice(-2), mm = ('0'+d.getMinutes()).slice(-2);
+    syncStatus.textContent = '已同步 ' + hh + ':' + mm;
+  }
+
+  // ---- 云端设置（管理员）----
+  function openCloudSettings(){
+    var cfg = loadCloudCfg() || {};
+    $('cfgOwner').value = cfg.owner || '';
+    $('cfgRepo').value = cfg.repo || '';
+    $('cfgBranch').value = cfg.branch || 'main';
+    $('cfgPath').value = cfg.path || '';
+    $('cfgToken').value = cfg.token || '';
+    $('cfgPass').value = '';
+    showModal('modalCloud');
+  }
+  function saveCloudSettings(){
+    var owner = $('cfgOwner').value.trim();
+    var repo = $('cfgRepo').value.trim();
+    var branch = $('cfgBranch').value.trim() || 'main';
+    var path = $('cfgPath').value.trim();
+    var token = $('cfgToken').value.trim();
+    var pass = $('cfgPass').value;
+    if(!owner || !repo || !token){ toast('请填写仓库拥有者、仓库名与令牌'); return; }
+    saveCloudCfg({ owner: owner, repo: repo, branch: branch, path: path, token: token });
+    if(!state.adminKeyHash){
+      if(!pass){ toast('首次设置请填写管理密码'); return; }
+      state.adminKeyHash = hashStr(pass);
+    } else if(pass){
+      state.adminKeyHash = hashStr(pass);
+    }
+    hideModal('modalCloud');
+    if(state.setupMode){
+      state.setupMode = false;
+      try { sessionStorage.setItem(ADMIN_SESSION_KEY, '1'); } catch(e){}
+      enterAdmin();
+      publishCloud();
+      toast('设置完成，已发布到云端');
+    } else {
+      toast('云端设置已保存' + (pass ? '，密码已更新' : ''));
+      if(pass) publishCloud();
+    }
+  }
+
+  // ---- 员工管理（管理员）----
+  function openEmpModal(){
+    renderEmpList();
+    showAdminLink();
+    showModal('modalEmp');
+  }
+  function showAdminLink(){
+    $('adminLink').textContent = location.origin + location.pathname + '?admin=1';
+  }
+  function renderEmpList(){
+    var list = state.employees || [];
+    var base = location.origin + location.pathname;
+    var html = '';
+    if(list.length === 0){
+      html = '<div class="empty">还没有员工，添加后生成专属链接分享给员工。</div>';
+    } else {
+      list.forEach(function(emp){
+        var link = base + '?emp=' + emp.id;
+        html += '<div class="emp-row">';
+        html += '  <div class="emp-info">';
+        html += '    <div class="emp-name">' + escapeHtml(emp.name) + '</div>';
+        html += '    <div class="emp-sub">' + (emp.disabled ? '<span class="badge-off">已停用</span>' : '<span class="badge-on">启用中</span>') + ' · ' + escapeHtml(link) + '</div>';
+        html += '  </div>';
+        html += '  <div class="emp-actions">';
+        html += '    <button class="btn btn-ghost btn-sm" data-emp-copy="' + emp.id + '">复制链接</button>';
+        html += '    <button class="btn btn-ghost btn-sm" data-emp-toggle="' + emp.id + '">' + (emp.disabled ? '启用' : '停用') + '</button>';
+        html += '    <button class="btn btn-ghost btn-sm" data-emp-del="' + emp.id + '">删除</button>';
+        html += '  </div>';
+        html += '</div>';
+      });
+    }
+    $('empList').innerHTML = html;
+    $('empList').querySelectorAll('[data-emp-copy]').forEach(function(b){
+      b.addEventListener('click', function(){
+        var e = findEmp(state.employees, b.getAttribute('data-emp-copy'));
+        if(e) copyText(location.origin + location.pathname + '?emp=' + e.id);
+      });
+    });
+    $('empList').querySelectorAll('[data-emp-toggle]').forEach(function(b){
+      b.addEventListener('click', function(){ toggleEmp(b.getAttribute('data-emp-toggle')); });
+    });
+    $('empList').querySelectorAll('[data-emp-del]').forEach(function(b){
+      b.addEventListener('click', function(){ delEmp(b.getAttribute('data-emp-del')); });
+    });
+  }
+  function addEmp(){
+    var name = $('empName').value.trim();
+    if(!name){ toast('请输入员工姓名/编号'); return; }
+    var id = 'e_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    state.employees = state.employees || [];
+    state.employees.push({ id: id, name: name, disabled: false });
+    saveEmployees();
+    renderEmpList();
+    copyText(location.origin + location.pathname + '?emp=' + id);
+    toast('已添加并复制员工链接');
+  }
+  function toggleEmp(id){
+    var e = findEmp(state.employees, id);
+    if(!e) return;
+    e.disabled = !e.disabled;
+    saveEmployees();
+    renderEmpList();
+    toast(e.disabled ? '已停用，发布同步后员工端立即失效' : '已启用，发布同步后生效');
+  }
+  function delEmp(id){
+    if(!confirm('确定删除该员工记录？')) return;
+    state.employees = (state.employees || []).filter(function(e){ return e.id !== id; });
+    saveEmployees();
+    renderEmpList();
+  }
+  function saveEmployees(){
+    try { localStorage.setItem(EMP_KEY, JSON.stringify(state.employees || [])); } catch(e){}
   }
 
   // 启动
