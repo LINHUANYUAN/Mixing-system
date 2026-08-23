@@ -1,0 +1,37 @@
+{
+  "version": 1787494580046,
+  "adminKeyHash": "73d334f3",
+  "recipes": [
+    {
+      "id": "lvdousha",
+      "name": "绿豆沙",
+      "builtin": true,
+      "ingredients": [
+        {
+          "name": "绿豆",
+          "amount": 1000
+        },
+        {
+          "name": "冰糖",
+          "amount": 1000
+        },
+        {
+          "name": "水",
+          "amount": 5000
+        },
+        {
+          "name": "冰块",
+          "amount": 9000
+        }
+      ]
+    }
+  ],
+  "employees": [
+    {
+      "id": "e_mt5np7ruy0g",
+      "name": "刘世英",
+      "disabled": false
+    }
+  ],
+  "publishedAt": "2026-08-23T14:16:20.046Z"
+}
