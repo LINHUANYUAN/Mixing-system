@@ -1,5 +1,5 @@
 {
-  "version": 1787494580046,
+  "version": 1787495542804,
   "adminKeyHash": "73d334f3",
   "recipes": [
     {
@@ -26,12 +26,6 @@
       ]
     }
   ],
-  "employees": [
-    {
-      "id": "e_mt5np7ruy0g",
-      "name": "刘世英",
-      "disabled": false
-    }
-  ],
-  "publishedAt": "2026-08-23T14:16:20.046Z"
+  "employees": [],
+  "publishedAt": "2026-08-23T14:32:22.804Z"
 }
