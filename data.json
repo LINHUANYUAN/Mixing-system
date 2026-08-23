@@ -1,5 +1,5 @@
 {
-  "version": 1787496471013,
+  "version": 1787496728674,
   "adminKeyHash": "8a0e635f",
   "recipes": [
     {
@@ -70,11 +70,26 @@
       "ingredients": [
         {
           "name": "酸梅膏",
+          "amount": 1000
+        },
+        {
+          "name": "纯净水",
+          "amount": 12000
+        }
+      ]
+    },
+    {
+      "id": "r_mt5xee0s_68sg5",
+      "name": "金桔柠檬茶",
+      "builtin": false,
+      "ingredients": [
+        {
+          "name": "浓缩汁",
           "amount": 1
         },
         {
           "name": "纯净水",
-          "amount": 12
+          "amount": 10
         }
       ]
     }
@@ -86,5 +101,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-08-23T14:47:51.013Z"
+  "publishedAt": "2026-08-23T14:52:08.674Z"
 }
