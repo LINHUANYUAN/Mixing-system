@@ -831,7 +831,11 @@
       </div>
       <div class="form-group">
         <label>GitHub 令牌（需 repo 写权限）</label>
-        <input type="password" class="form-input" id="cfgToken" placeholder="ghp_xxxxxxxx">
+        <div style="display:flex;gap:6px">
+          <input type="password" class="form-input" id="cfgToken" placeholder="ghp_xxxxxxxx" autocomplete="new-password" spellcheck="false" style="flex:1">
+          <button class="btn btn-ghost" id="btnEyeToken" type="button" title="显示/隐藏令牌，用于核对是否粘贴完整">👁</button>
+        </div>
+        <p class="form-hint" id="tokenCheckHint" style="color:var(--text-muted)">粘贴令牌后会自动自检格式</p>
       </div>
       <div class="form-group">
         <label>管理密码（首次必填，之后可改）</label>
@@ -1797,6 +1801,17 @@
     // 云端设置弹窗内按钮
     var bsc = $('btnSaveCloud'); if(bsc) bsc.addEventListener('click', function(){ saveCloudSettings(); });
     var btc = $('btnTestCloud'); if(btc) btc.addEventListener('click', function(){ testCloudConnection(); });
+    // 令牌：显示/隐藏切换 + 粘贴后实时自检
+    var bet = $('btnEyeToken'); if(bet) bet.addEventListener('click', function(){
+      var inp = $('cfgToken');
+      var show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      bet.textContent = show ? '🙈' : '👁';
+      if(show && inp.value.trim()){ updateTokenHint(checkTokenFormat(inp.value).msg); }
+    });
+    var ct = $('cfgToken'); if(ct) ct.addEventListener('input', function(){
+      updateTokenHint(checkTokenFormat(ct.value).msg);
+    });
 
     // 模态框关闭
     document.querySelectorAll('[data-close]').forEach(function(el){
@@ -1879,6 +1894,10 @@
           var err = new Error('GitHub ' + r.status + '：' + gm);
           err.status = r.status;
           err.apiMessage = gm;
+          if(r.status === 401){
+            var tk = (cfg.token || '');
+            err.tokenInfo = { prefix: tk.slice(0, 6), len: tk.length };
+          }
           throw err;
         }
         return data;
@@ -1899,12 +1918,43 @@
   }
   function cloudErrMsg(err){
     if(!err) return '未知错误';
-    if(err.status === 401) return '令牌无效或已过期（401）：请到 GitHub 重新生成令牌，再到「⚙ 云端设置」更新';
+    if(err.status === 401){
+      var tip = '令牌无效或已过期（401）';
+      if(err.tokenInfo) tip += '，本次发送的令牌：前缀「' + err.tokenInfo.prefix + '」长度 ' + err.tokenInfo.len + ' 字符';
+      if(err.tokenInfo && err.tokenInfo.len > 0 && err.tokenInfo.len < 40) tip += '——长度异常，多半是复制时漏了字符，请重新完整复制！';
+      tip += '。GitHub 原话：' + (err.apiMessage || 'Bad credentials');
+      tip += '。排查：①点👁显示令牌，核对首尾是否完整 ②确认复制的是 ghp_ 开头那串（不是令牌名字）③回 GitHub 令牌页重新点复制图标';
+      return tip;
+    }
     if(err.status === 404) return '仓库不存在或令牌无权访问（404）：请检查 ①仓库拥有者/仓库名拼写（区分大小写）②若是 Fine-grained 令牌，必须在该令牌设置里勾选了这个仓库 ③Classic 令牌必须勾选 repo 权限';
     if(err.status === 403) return '令牌权限不足（403）：Fine-grained 令牌需开 Contents: Read and write；Classic 令牌需勾选 repo';
     if(err.status === 409) return '云端文件冲突（409）：data.json 刚被更新过，请再点一次「发布同步」';
     if(err.status === 422) return '请求被拒（422）：多半是分支名不存在，请确认分支名（在 GitHub 仓库页左上角可看默认分支）';
     return (err && err.message) ? err.message : String(err);
+  }
+  // 令牌格式自检：返回人话诊断；ok 为 true 才放行
+  function checkTokenFormat(token){
+    var t = (token || '').trim();
+    if(!t) return { ok:false, msg:'未填写令牌' };
+    // 只允许令牌字符（防粘贴进中文/全角空格）
+    if(/\s/.test(t)) return { ok:false, msg:'❌ 令牌中含有空格/换行——粘贴时混入了多余内容，请清空后重新粘贴' };
+    var prefix = t.slice(0, 4);
+    if(t.indexOf('github_pat_') === 0){
+      if(t.length < 60) return { ok:false, msg:'❌ Fine-grained 令牌长度仅 ' + t.length + '（正常约 90+），复制不完整，请重新复制' };
+      return { ok:true, msg:'✅ Fine-grained 令牌，长度 ' + t.length + '，格式正常（记得在该令牌设置里勾选了仓库并给 Contents 读写权限）' };
+    }
+    if(t.indexOf('ghp_') === 0){
+      if(t.length !== 40) return { ok:false, msg:'❌ Classic 令牌长度为 ' + t.length + '，正常应为 40（ghp_ + 36位）——复制不完整！请回令牌页点复制图标重试' };
+      return { ok:true, msg:'✅ Classic 令牌，长度 40，格式正常' };
+    }
+    if(/^(gho_|ghu_|ghs_|ghr_)/.test(t)) return { ok:false, msg:'❌ 这是其他类型的 GitHub 凭证，请生成 Personal Access Token（ghp_ 或 github_pat_ 开头）' };
+    return { ok:false, msg:'❌ 令牌应以 ghp_（Classic）或 github_pat_（Fine-grained）开头，你粘贴的开头是「' + t.slice(0,8) + '」——可能复制错了内容' };
+  }
+  // 令牌自检提示渲染（红色警示 / 正常灰）
+  function updateTokenHint(msg){
+    var el = $('tokenCheckHint'); if(!el) return;
+    el.textContent = msg || '粘贴令牌后会自动自检格式';
+    el.style.color = (msg && msg.indexOf('✅') === 0) ? 'var(--accent, #16a34a)' : 'var(--danger, #dc2626)';
   }
   function checkRepoAccess(cfg){
     return githubApi(cfg, '', 'GET'); // 返回仓库信息（含 default_branch）
@@ -2065,6 +2115,7 @@
     $('cfgBranch').value = cfg.branch || 'main';
     $('cfgToken').value = cfg.token || '';
     $('cfgPass').value = '';
+    updateTokenHint(cfg.token ? checkTokenFormat(cfg.token).msg : '粘贴令牌后会自动自检格式');
     showModal('modalCloud');
   }
   // 测试连接：逐项诊断 owner/repo/令牌，给出人话报错
@@ -2074,6 +2125,9 @@
     var branch = $('cfgBranch').value.trim() || 'main';
     var token = $('cfgToken').value.trim();
     if(!owner || !repo || !token){ toast('请先填写仓库拥有者、仓库名与令牌', 3000); return; }
+    var tf = checkTokenFormat(token);
+    updateTokenHint(tf.msg);
+    if(!tf.ok){ toast('令牌格式有问题，未发送请求：' + tf.msg, 6000); return; }
     $('cfgOwner').value = owner;
     $('cfgRepo').value = repo;
     var btn = $('btnTestCloud');
@@ -2081,6 +2135,7 @@
     btn.disabled = true; btn.textContent = '测试中…';
     var cfg = { owner: owner, repo: repo, branch: branch, path: '', token: token };
     checkRepoAccess(cfg).then(function(info){
+      updateTokenHint('✅ 令牌有效且仓库可访问');
       var db = info.default_branch || 'main';
       if(branch !== db){
         toast('✅ 仓库可访问！注意：仓库默认分支是「' + db + '」，你填的是「' + branch + '」，发布将使用你填的分支，请确认它存在', 5000);
@@ -2088,7 +2143,7 @@
         toast('✅ 连接成功！仓库可访问，默认分支：' + db + '，可以保存并发布了', 4000);
       }
     }).catch(function(err){
-      toast('❌ ' + cloudErrMsg(err), 7000);
+      toast('❌ ' + cloudErrMsg(err), 9000);
     }).then(function(){
       btn.disabled = false; btn.textContent = old;
     });
@@ -2101,6 +2156,9 @@
     var token = $('cfgToken').value.trim();
     var pass = $('cfgPass').value;
     if(!owner || !repo || !token){ toast('请填写仓库拥有者（或直接粘贴仓库网址）、仓库名与令牌'); return; }
+    var tf = checkTokenFormat(token);
+    updateTokenHint(tf.msg);
+    if(!tf.ok){ toast('令牌格式有问题：' + tf.msg, 6000); return; }
     // 回填纠正后的 owner/repo（用户可能粘贴了完整 URL）
     $('cfgOwner').value = owner;
     $('cfgRepo').value = repo;
