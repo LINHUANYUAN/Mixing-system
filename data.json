@@ -1,6 +1,6 @@
 {
-  "version": 1787495909321,
-  "adminKeyHash": "",
+  "version": 1787496349185,
+  "adminKeyHash": "8a0e635f",
   "recipes": [
     {
       "id": "lvdousha",
@@ -71,5 +71,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-08-23T14:38:29.321Z"
+  "publishedAt": "2026-08-23T14:45:49.185Z"
 }
