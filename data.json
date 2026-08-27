@@ -1,6 +1,6 @@
 {
-  "version": 1787496728674,
-  "adminKeyHash": "",
+  "version": 1787812169863,
+  "adminKeyHash": "f147d366",
   "recipes": [
     {
       "id": "lvdousha",
@@ -94,12 +94,6 @@
       ]
     }
   ],
-  "employees": [
-    {
-      "id": "e_mt5wtv4t993",
-      "name": "刘世英",
-      "disabled": false
-    }
-  ],
-  "publishedAt": "2026-08-23T14:52:08.674Z"
+  "employees": [],
+  "publishedAt": "2026-08-27T06:29:29.863Z"
 }
