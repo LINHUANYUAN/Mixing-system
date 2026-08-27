@@ -1,5 +1,5 @@
 {
-  "version": 1787812194621,
+  "version": 1787812583290,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -70,11 +70,19 @@
       "ingredients": [
         {
           "name": "酸梅膏",
-          "amount": 1000
+          "amount": 38
         },
         {
           "name": "纯净水",
-          "amount": 12000
+          "amount": 462
+        },
+        {
+          "name": "杯容量",
+          "amount": 500
+        },
+        {
+          "name": "杯数",
+          "amount": 1
         }
       ]
     },
@@ -101,5 +109,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-08-27T06:29:54.621Z"
+  "publishedAt": "2026-08-27T06:36:23.290Z"
 }
