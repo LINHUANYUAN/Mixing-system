@@ -1,5 +1,5 @@
 {
-  "version": 1787812583290,
+  "version": 1788308911530,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -107,7 +107,12 @@
       "id": "e_mt5wtv4t993",
       "name": "刘世英",
       "disabled": false
+    },
+    {
+      "id": "e_mtjc98ssb18",
+      "name": "谭晓红",
+      "disabled": false
     }
   ],
-  "publishedAt": "2026-08-27T06:36:23.290Z"
+  "publishedAt": "2026-09-02T00:28:31.530Z"
 }
