@@ -1,5 +1,5 @@
 {
-  "version": 1788323236765,
+  "version": 1788323377655,
   "adminKeyHash": "",
   "recipes": [
     {
@@ -9,23 +9,23 @@
       "ingredients": [
         {
           "name": "绿豆",
-          "amount": 1000
+          "amount": 500
         },
         {
           "name": "冰糖",
-          "amount": 1000
+          "amount": 500
         },
         {
           "name": "水",
-          "amount": 5000
+          "amount": 2500
         },
         {
           "name": "冰块",
-          "amount": 9000
+          "amount": 4500
         },
         {
           "name": "糯米",
-          "amount": 60
+          "amount": 30
         }
       ]
     },
@@ -118,5 +118,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-02T04:27:16.765Z"
+  "publishedAt": "2026-09-02T04:29:37.655Z"
 }
