@@ -1,5 +1,5 @@
 {
-  "version": 1788323173091,
+  "version": 1788323236765,
   "adminKeyHash": "",
   "recipes": [
     {
@@ -21,7 +21,7 @@
         },
         {
           "name": "冰块",
-          "amount": 18000
+          "amount": 9000
         },
         {
           "name": "糯米",
@@ -118,5 +118,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-02T04:26:13.091Z"
+  "publishedAt": "2026-09-02T04:27:16.765Z"
 }
