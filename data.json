@@ -1,5 +1,5 @@
 {
-  "version": 1789878377450,
+  "version": 1789878498443,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -124,7 +124,7 @@
         },
         {
           "name": "杯数",
-          "amount": 10
+          "amount": 18
         }
       ]
     }
@@ -141,5 +141,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-20T04:26:17.450Z"
+  "publishedAt": "2026-09-20T04:28:18.443Z"
 }
