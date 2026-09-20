@@ -1,5 +1,5 @@
 {
-  "version": 1789797439570,
+  "version": 1789878377450,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -112,15 +112,15 @@
       "ingredients": [
         {
           "name": "琥珀红茶",
-          "amount": 30
+          "amount": 50
         },
         {
           "name": "90℃开水",
-          "amount": 1650
+          "amount": 3300
         },
         {
           "name": "植脂末",
-          "amount": 230
+          "amount": 450
         },
         {
           "name": "杯数",
@@ -141,5 +141,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-19T05:57:19.571Z"
+  "publishedAt": "2026-09-20T04:26:17.450Z"
 }
