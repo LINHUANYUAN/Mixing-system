@@ -1,5 +1,5 @@
 {
-  "version": 1789878498443,
+  "version": 1790306746619,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -127,6 +127,33 @@
           "amount": 18
         }
       ]
+    },
+    {
+      "id": "r_mugedmud_9n6jx",
+      "name": "茶汤奶基底",
+      "builtin": false,
+      "ingredients": [
+        {
+          "name": "茶叶",
+          "amount": 50
+        },
+        {
+          "name": "开水",
+          "amount": 1500
+        },
+        {
+          "name": "冰块",
+          "amount": 750
+        },
+        {
+          "name": "奶基底",
+          "amount": 1500
+        },
+        {
+          "name": "投料",
+          "amount": 200
+        }
+      ]
     }
   ],
   "employees": [
@@ -141,5 +168,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-20T04:28:18.443Z"
+  "publishedAt": "2026-09-25T03:25:46.619Z"
 }
