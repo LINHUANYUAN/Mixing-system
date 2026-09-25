@@ -1,6 +1,6 @@
 {
-  "version": 1790306809966,
-  "adminKeyHash": "",
+  "version": 1790307197875,
+  "adminKeyHash": "f147d366",
   "recipes": [
     {
       "id": "lvdousha",
@@ -134,16 +134,8 @@
       "builtin": false,
       "ingredients": [
         {
-          "name": "茶叶",
-          "amount": 50
-        },
-        {
-          "name": "开水",
-          "amount": 1500
-        },
-        {
-          "name": "冰块",
-          "amount": 750
+          "name": "茶汤",
+          "amount": 2300
         },
         {
           "name": "奶基底",
@@ -168,5 +160,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-25T03:26:49.966Z"
+  "publishedAt": "2026-09-25T03:33:17.875Z"
 }
