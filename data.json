@@ -1,5 +1,5 @@
 {
-  "version": 1790307197875,
+  "version": 1790307383500,
   "adminKeyHash": "f147d366",
   "recipes": [
     {
@@ -129,20 +129,40 @@
       ]
     },
     {
-      "id": "r_mugedmud_9n6jx",
-      "name": "茶汤奶基底",
+      "id": "r_muges21w_p1d7m",
+      "name": "茶基底投放比例",
       "builtin": false,
       "ingredients": [
         {
-          "name": "茶汤",
+          "name": "茶叶",
+          "amount": 50
+        },
+        {
+          "name": "开水",
+          "amount": 1500
+        },
+        {
+          "name": "冰块",
+          "amount": 750
+        },
+        {
+          "name": "成茶汤",
           "amount": 2300
+        },
+        {
+          "name": "开水",
+          "amount": 1050
+        },
+        {
+          "name": "奶粉",
+          "amount": 450
         },
         {
           "name": "奶基底",
           "amount": 1500
         },
         {
-          "name": "投料",
+          "name": "总成料",
           "amount": 3800
         }
       ]
@@ -160,5 +180,5 @@
       "disabled": false
     }
   ],
-  "publishedAt": "2026-09-25T03:33:17.875Z"
+  "publishedAt": "2026-09-25T03:36:23.500Z"
 }
